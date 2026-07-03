@@ -31,7 +31,7 @@
   .stat{background:var(--bg-alt); border-radius:var(--radius-md); padding:14px 20px; min-width:96px;}
   .stat-value{font-family:var(--font-display); font-size:22px; font-weight:700; display:block;}
   .stat-label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;}
-  .share-badge { background: var(--accent-soft); color: var(--accent-ink); padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--accent); cursor: pointer; transition: background 0.2s;}
+  .share-badge { background: var(--accent-soft); color: var(--accent-ink); padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--accent); cursor: pointer; transition: background 0.2s;}
   .share-badge:hover { background: var(--accent); color: white; }
   .section-head{display:flex; align-items:center; gap:12px; margin:52px 0 20px;}
   .section-head .num{font-family:var(--font-mono); background:var(--ink); color:#fff; font-size:11px; padding:3px 8px; border-radius:20px; flex:none;}
@@ -178,12 +178,10 @@
       <span class="hero-eyebrow">Wishlist Partagée</span>
       <h1 class="hero-title">Ma liste de<br>vêtements</h1>
       <div class="io-actions">
-        <button class="btn btn-small" id="exportBtn">Exporter la liste</button>
-        <label class="btn btn-small" for="importInput" style="display:inline-flex;align-items:center;">Importer une liste</label>
-        <input type="file" id="importInput" accept="application/json" style="display:none;">
-        <button class="share-badge" id="shareBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-          Partager
+        <!-- APPEL DIRECT À LA FONCTION DE PARTAGE INFAILLIBLE -->
+        <button class="share-badge" id="shareBtn" onclick="partagerListe()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          Partager cette liste
         </button>
       </div>
     </div>
@@ -213,10 +211,7 @@
         </div>
         <div class="field-grid">
           <div class="field"><label class="field-title" for="f-shop">Boutique</label><input id="f-shop" type="text" placeholder="Détectée depuis le lien"></div>
-          
-          <!-- CORRECTION ICI : Changement en type "text" et inputmode="decimal" pour accepter les virgules -->
-          <div class="field"><label class="field-title" for="f-price">Prix</label><input id="f-price" type="text" inputmode="decimal" placeholder="49.90"></div>
-          
+          <div class="field"><label class="field-title" for="f-price">Prix</label><input id="f-price" type="number" min="0" step="0.01" placeholder="49.90"></div>
           <div class="field"><label class="field-title" for="f-size">Taille</label><input id="f-size" type="text" placeholder="M / 38"></div>
           <div class="field">
             <label class="field-title">Disponibilité</label>
@@ -282,6 +277,28 @@
   <footer>Les données sont sauvegardées en temps réel sur le cloud (Firebase).</footer>
 </div>
 
+<!-- LE SCRIPT DE PARTAGE INFAILLIBLE (Placé hors du module) -->
+<script>
+  function partagerListe() {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: 'Ma Wishlist Partagée', url: url }).catch(e => console.log("Partage annulé"));
+    } else {
+      try {
+        navigator.clipboard.writeText(url).then(() => alert("✅ Lien copié dans le presse-papier !"));
+      } catch (err) {
+        const input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        alert("✅ Lien copié dans le presse-papier !");
+      }
+    }
+  }
+</script>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -337,13 +354,7 @@
     onSnapshot(doc(db, "wishlists", listId), (docSnap) => {
       if (docSnap.exists()) { state = docSnap.data(); } 
       else { state = { categories: DEFAULT_CATEGORIES.map(c => ({...c})), items: [], collapsedCats: [], tagColors: {} }; saveState(); }
-      
-      // CORRECTION ICI : Initialisation sécurisée pour éviter les crashs si Firebase est vide
-      if(!state.items) state.items = [];
-      if(!state.categories) state.categories = [];
-      if(!state.collapsedCats) state.collapsedCats = []; 
-      if(!state.tagColors) state.tagColors = {};
-      
+      if(!state.collapsedCats) state.collapsedCats = []; if(!state.tagColors) state.tagColors = {};
       ensureDefaultCategories(); render();
     });
   }
@@ -358,7 +369,11 @@
   async function fetchPreview(url) {
     const token = ++fetchToken;
     const box = document.getElementById('previewBox');
-    box.innerHTML = `<span class="preview-placeholder">Recherche en cours via le serveur Render...</span>`;
+    
+    // Animation de chargement pour rassurer pendant le réveil de Render
+    box.innerHTML = `<div style="text-align:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg><br><span style="font-size:10px;color:var(--muted);display:block;margin-top:8px;">Recherche en cours...</span></div>
+    <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
+    
     fetchedImage = null;
     try {
       const res = await fetch(`${RENDER_API_URL}/api/scrape?url=${encodeURIComponent(url)}`);
@@ -371,7 +386,7 @@
       const priceField = document.getElementById('f-price'); if (!priceField.value && data.price != null) priceField.value = data.price;
       const availCheckbox = document.getElementById('f-avail-rupture'); if (data.availability === 'Rupture') availCheckbox.checked = true; else availCheckbox.checked = false;
       const noteField = document.getElementById('f-note'); if (!noteField.value && data.title) noteField.value = data.title.slice(0, 80);
-    } catch(e) { if (token !== fetchToken) return; box.innerHTML = `<span class="preview-placeholder">Échec de la récupération. Le serveur Render est bien allumé ?</span>`; }
+    } catch(e) { if (token !== fetchToken) return; box.innerHTML = `<span class="preview-placeholder" style="color:var(--bad);">Échec de la récupération. Entrez les infos manuellement.</span>`; }
   }
 
   let urlDebounce;
@@ -433,50 +448,19 @@
   }
   document.getElementById('cancelEdit').addEventListener('click', resetForm);
 
-  // CORRECTION ICI : Gestion du clic pour ajouter l'article
   document.getElementById('submitBtn').addEventListener('click', () => {
-    const url = document.getElementById('f-url').value.trim();
-    const shop = document.getElementById('f-shop').value.trim();
-    
-    // Remplacement intelligent de la virgule par un point pour le prix
-    let rawPrice = document.getElementById('f-price').value.trim();
-    if(rawPrice) { rawPrice = rawPrice.replace(/,/g, '.').replace(/[^\d.-]/g, ''); }
-    const price = parseFloat(rawPrice);
-
+    const url = document.getElementById('f-url').value.trim(), shop = document.getElementById('f-shop').value.trim(), price = parseFloat(document.getElementById('f-price').value);
     const size = document.getElementById('f-size').value.trim();
     const avail = document.getElementById('f-avail-rupture').checked ? 'Rupture' : 'En stock';
     let cat = document.getElementById('f-cat').value;
     if (!cat && state.categories.length > 0) cat = state.categories[0].id;
     const note = document.getElementById('f-note').value.trim();
-    
-    if(!url || !shop || isNaN(price)){ 
-      alert('Merci de renseigner au moins le lien, la boutique et un prix valide (ex: 49.90).'); 
-      return; 
-    }
-    
+    if(!url || !shop || isNaN(price)){ alert('Merci de renseigner au moins le lien, la boutique et le prix.'); return; }
     if(currentTags.length === 0 && document.getElementById('f-tags-input').value.trim()) addTagFromInput();
     const tags = [...currentTags];
-    
-    if(!state.items) state.items = []; // Sécurité
-
-    if(editingId){ 
-      Object.assign(state.items.find(i => i.id === editingId), {url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null}); 
-    } else { 
-      state.items.push({ id: uid(), url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null, addedAt: Date.now() }); 
-    }
-    
-    // Ordre très important : On sauvegarde, on actualise l'UI de force, puis on réinitialise
-    saveState(); 
-    render(); 
-    resetForm(); 
-
-    // Optionnel : Refermer le panneau d'ajout après avoir ajouté un article
-    const panel = document.getElementById('addArticlePanel');
-    const icon = document.getElementById('addArticleIcon');
-    if (!panel.classList.contains('collapsed')) { 
-       panel.classList.add('collapsed'); 
-       icon.classList.add('rotated'); 
-    }
+    if(editingId){ Object.assign(state.items.find(i => i.id === editingId), {url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null}); } 
+    else { state.items.push({ id: uid(), url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null, addedAt: Date.now() }); }
+    saveState(); resetForm(); 
   });
 
   window.startEdit = function(id){
@@ -492,7 +476,7 @@
     document.getElementById('submitBtn').textContent = 'Enregistrer les modifications'; document.getElementById('cancelEdit').style.display = 'inline-block';
     document.querySelector('.panel').scrollIntoView({behavior: 'smooth', block: 'center'});
   }
-  window.deleteItem = function(id){ state.items = state.items.filter(i => i.id !== id); saveState(); render(); }
+  window.deleteItem = function(id){ state.items = state.items.filter(i => i.id !== id); saveState(); }
   document.getElementById('searchInput').addEventListener('input', render);
 
   function renderCatChip(cat, isSub, hasChildren = false){ 
@@ -525,13 +509,13 @@
         const fallbackId = state.categories[0].id;
         state.items.forEach(it => { if(allIds.includes(it.categoryId)) it.categoryId = fallbackId; }); 
         if(allIds.includes(activeCategoryFilter)) activeCategoryFilter = 'all'; 
-        saveState(); render();
+        saveState(); 
       }); 
     });
     document.getElementById('addCatBtn').addEventListener('click', addCategory); document.getElementById('newCatInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') addCategory(); });
   }
 
-  function addCategory(){ const input = document.getElementById('newCatInput'), parentSel = document.getElementById('newCatParent'), name = input.value.trim(); if(!name) return; const parentId = parentSel.value || null, id = uid(); state.categories.push({id, name, color: colorForIndex(state.categories.length), parentId, locked:false}); input.value = ''; saveState(); render(); }
+  function addCategory(){ const input = document.getElementById('newCatInput'), parentSel = document.getElementById('newCatParent'), name = input.value.trim(); if(!name) return; const parentId = parentSel.value || null, id = uid(); state.categories.push({id, name, color: colorForIndex(state.categories.length), parentId, locked:false}); input.value = ''; saveState(); }
   function itemMatchesSearch(item, query){ if(!query) return true; return `${item.shop} ${item.note||''} ${item.size} ${(item.tags||[]).join(' ')}`.toLowerCase().includes(query.toLowerCase()); }
   function itemMatchesTags(item){ if(activeTagFilters.size === 0) return true; return (item.tags||[]).some(t => activeTagFilters.has(t)); }
 
@@ -546,14 +530,10 @@
     const clearBtn = document.getElementById('clearTagFilters'); if(clearBtn) clearBtn.addEventListener('click', () => { activeTagFilters.clear(); render(); });
   }
 
-  function iconEdit(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
-  function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6h12z"/></svg>`; }
-  function iconHanger(color){ return `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6"><circle cx="12" cy="4" r="1.6"/><path d="M12 6v2"/><path d="M2 20l8.5-6a2 2 0 012.9 0L22 20"/><path d="M2 20h20"/></svg>`; }
-
   function renderItemCard(item){
     const cat = findCategory(item.categoryId), style = AVAIL_STYLE[item.availability] || AVAIL_STYLE['Inconnue'];
     const photoHtml = `<div class="ph-placeholder" style="background:${cat.color}18">${iconHanger(cat.color)}</div>${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.shop)}" loading="lazy" onerror="this.style.display='none'">` : ''}`;
-    return `<div class="item-card"><div class="ic-photo">${photoHtml}<span class="ic-avail" style="background:${style.bg};color:${style.fg}">${escapeHtml(item.availability)}</span><div class="ic-icons"><button title="Modifier" onclick="window.startEdit('${item.id}')">${iconEdit()}</button><button title="Supprimer" onclick="if(confirm('Supprimer cet article ?')) window.deleteItem('${item.id}')">${iconTrash()}</button></div></div><div class="ic-body"><div class="ic-cat" style="color:${cat.color}"><span class="dot" style="background:${cat.color}"></span>${escapeHtml(cat.name)}</div><p class="ic-shop">${escapeHtml(item.shop)}</p>${item.note ? `<p class="ic-note">${escapeHtml(item.note)}</p>` : ''}${(item.tags && item.tags.length) ? `<div class="ic-tags">${item.tags.map(t => `<span class="ic-tag" style="background:${tagColor(t)}">${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="ic-row"><span class="ic-price">${formatPrice(item.price)}</span><span class="ic-size">${escapeHtml(item.size || '—')}</span></div><a class="ic-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Voir l'article ↗</a></div></div>`;
+    return `<div class="item-card"><div class="ic-photo">${photoHtml}<span class="ic-avail" style="background:${style.bg};color:${style.fg}">${escapeHtml(item.availability)}</span><div class="ic-icons"><button title="Modifier" onclick="window.startEdit('${item.id}')">${iconEdit()}</button><button title="Supprimer" onclick="if(confirm('Supprimer ?')) window.deleteItem('${item.id}')">${iconTrash()}</button></div></div><div class="ic-body"><div class="ic-cat" style="color:${cat.color}"><span class="dot" style="background:${cat.color}"></span>${escapeHtml(cat.name)}</div><p class="ic-shop">${escapeHtml(item.shop)}</p>${item.note ? `<p class="ic-note">${escapeHtml(item.note)}</p>` : ''}${(item.tags && item.tags.length) ? `<div class="ic-tags">${item.tags.map(t => `<span class="ic-tag" style="background:${tagColor(t)}">${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="ic-row"><span class="ic-price">${formatPrice(item.price)}</span><span class="ic-size">${escapeHtml(item.size || '—')}</span></div><a class="ic-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Voir l'article ↗</a></div></div>`;
   }
   
   function itemsForCategoryId(catId, query){ return state.items.filter(i => i.categoryId === catId && itemMatchesSearch(i, query) && itemMatchesTags(i)); }
@@ -600,56 +580,8 @@
     chartEl.querySelectorAll('.legend-row').forEach(row => { row.addEventListener('click', () => { const label = row.dataset.legend; if (chartExcluded.has(label)) chartExcluded.delete(label); else chartExcluded.add(label); renderSummary(); }); });
   }
 
-  // ---------------------------------------------------------
-  // FONCTION DE PARTAGE (TRICOUNT-STYLE)
-  // ---------------------------------------------------------
-  document.getElementById('shareBtn').addEventListener('click', async () => {
-    const shareUrl = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Ma Wishlist Partagée', text: 'Rejoins ma wishlist pour voir et ajouter des vêtements !', url: shareUrl });
-        return; 
-      } catch (err) { console.log('Partage annulé ou non supporté par le système'); }
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      alert('Lien copié dans le presse-papier ! Envoyez-le à vos amis.');
-    } catch (err) { prompt("Votre navigateur bloque la copie automatique. Copiez ce lien manuellement :", shareUrl); }
-  });
-
-  // ---------------------------------------------------------
-  // BONUS : FONCTIONS D'EXPORT ET IMPORT
-  // ---------------------------------------------------------
-  document.getElementById('exportBtn').addEventListener('click', () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-    const dl = document.createElement('a');
-    dl.setAttribute("href", dataStr);
-    dl.setAttribute("download", "wishlist-" + listId + ".json");
-    document.body.appendChild(dl); dl.click(); dl.remove();
-  });
-
-  document.getElementById('importInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const imported = JSON.parse(event.target.result);
-        if(imported && Array.isArray(imported.items)){
-          state = imported;
-          saveState(); render();
-          alert("Liste importée avec succès !");
-        } else { alert("Le fichier n'est pas une sauvegarde valide."); }
-      } catch(err) { alert("Erreur lors de la lecture du fichier."); }
-    };
-    reader.readAsText(file);
-    e.target.value = ''; // Réinitialise l'input
-  });
-
   document.querySelectorAll('.toggle-btn').forEach(btn => { btn.addEventListener('click', () => { chartMode = btn.dataset.chartmode; chartExcluded.clear(); document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === btn)); renderSummary(); }); });
   function render(){ renderCategorySelect(); renderCategoryToolbar(); renderTagToolbar(); renderRacks(); renderSummary(); }
-  
-  // Démarrage
   loadState();
 </script>
 </body>
