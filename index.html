@@ -506,12 +506,43 @@
     const clearBtn = document.getElementById('clearTagFilters'); if(clearBtn) clearBtn.addEventListener('click', () => { activeTagFilters.clear(); render(); });
   }
 
+  function iconEdit(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
+  function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6h12z"/></svg>`; }
+  function iconHanger(color){ return `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6"><circle cx="12" cy="4" r="1.6"/><path d="M12 6v2"/><path d="M2 20l8.5-6a2 2 0 012.9 0L22 20"/><path d="M2 20h20"/></svg>`; }
+
   function renderItemCard(item){
     const cat = findCategory(item.categoryId), style = AVAIL_STYLE[item.availability] || AVAIL_STYLE['Inconnue'];
     const photoHtml = `<div class="ph-placeholder" style="background:${cat.color}18">${iconHanger(cat.color)}</div>${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.shop)}" loading="lazy" onerror="this.style.display='none'">` : ''}`;
     return `<div class="item-card"><div class="ic-photo">${photoHtml}<span class="ic-avail" style="background:${style.bg};color:${style.fg}">${escapeHtml(item.availability)}</span><div class="ic-icons"><button title="Modifier" onclick="window.startEdit('${item.id}')">${iconEdit()}</button><button title="Supprimer" onclick="if(confirm('Supprimer ?')) window.deleteItem('${item.id}')">${iconTrash()}</button></div></div><div class="ic-body"><div class="ic-cat" style="color:${cat.color}"><span class="dot" style="background:${cat.color}"></span>${escapeHtml(cat.name)}</div><p class="ic-shop">${escapeHtml(item.shop)}</p>${item.note ? `<p class="ic-note">${escapeHtml(item.note)}</p>` : ''}${(item.tags && item.tags.length) ? `<div class="ic-tags">${item.tags.map(t => `<span class="ic-tag" style="background:${tagColor(t)}">${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="ic-row"><span class="ic-price">${formatPrice(item.price)}</span><span class="ic-size">${escapeHtml(item.size || '—')}</span></div><a class="ic-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Voir l'article ↗</a></div></div>`;
   }
   
+  function itemsForCategoryId(catId, query){ return state.items.filter(i => i.categoryId === catId && itemMatchesSearch(i, query) && itemMatchesTags(i)); }
+  function renderLeafSection(cat, items){ return `<div class="cat-section"><div class="cat-section-head"><span class="cat-dot-big" style="background:${cat.color}"></span><h3>${escapeHtml(cat.name)}</h3><span class="cat-section-count">${items.length} article${items.length>1?'s':''}</span></div>${items.length ? `<div class="card-grid">${items.map(renderItemCard).join('')}</div>` : `<div class="section-empty">Aucun article ici pour l'instant.</div>`}</div>`; }
+
+  function renderRacks(){
+    const el = document.getElementById('racks'), query = document.getElementById('searchInput').value;
+    if(state.items.length === 0){ el.innerHTML = `<div class="global-empty"><strong>La liste est vide</strong>Ajoutez votre premier lien ci-dessus pour commencer.</div>`; return; }
+    let html = '', anyVisible = false; const filterCat = activeCategoryFilter === 'all' ? null : state.categories.find(c => c.id === activeCategoryFilter);
+    if(filterCat && filterCat.parentId){ const items = itemsForCategoryId(filterCat.id, query); anyVisible = items.length > 0; html += renderLeafSection(filterCat, items);
+    } else {
+      const topsToRender = filterCat ? [filterCat] : getTopLevelCategories();
+      topsToRender.forEach(top => {
+        const children = getChildren(top.id), ownItems = itemsForCategoryId(top.id, query), childBlocks = children.map(child => ({ cat: child, items: itemsForCategoryId(child.id, query) })), totalCount = ownItems.length + childBlocks.reduce((s, b) => s + b.items.length, 0);
+        if(activeCategoryFilter === 'all' && totalCount === 0) return; anyVisible = true;
+        let inner;
+        if(children.length === 0){ inner = ownItems.length ? `<div class="card-grid">${ownItems.map(renderItemCard).join('')}</div>` : `<div class="section-empty">Aucun article ici pour l'instant.</div>`;
+        } else {
+          let sub = ''; childBlocks.forEach(b => { if(b.items.length === 0 && activeCategoryFilter === 'all') return; sub += `<div class="sub-section"><div class="sub-section-head"><span class="sub-dot" style="background:${b.cat.color}"></span><h4>${escapeHtml(b.cat.name)}</h4><span class="cat-section-count">${b.items.length} article${b.items.length>1?'s':''}</span></div>${b.items.length ? `<div class="card-grid">${b.items.map(renderItemCard).join('')}</div>` : `<div class="section-empty">Aucun article ici pour l'instant.</div>`}</div>`; });
+          if(ownItems.length){ sub += `<div class="sub-section"><div class="sub-section-head"><span class="sub-dot" style="background:${top.color}"></span><h4>Autres (${escapeHtml(top.name)})</h4><span class="cat-section-count">${ownItems.length} article${ownItems.length>1?'s':''}</span></div><div class="card-grid">${ownItems.map(renderItemCard).join('')}</div></div>`; }
+          inner = sub || `<div class="section-empty">Aucun article ici pour l'instant.</div>`;
+        }
+        html += `<div class="cat-section"><div class="cat-section-head"><span class="cat-dot-big" style="background:${top.color}"></span><h3>${escapeHtml(top.name)}</h3><span class="cat-section-count">${totalCount} article${totalCount>1?'s':''}</span></div>${inner}</div>`;
+      });
+    }
+    if(!anyVisible) html = `<div class="global-empty"><strong>Aucun résultat</strong>Essayez un autre terme de recherche ou une autre catégorie.</div>`;
+    el.innerHTML = html;
+  }
+
   function renderSummary(){
     const total = state.items.reduce((s,i) => s + (Number(i.price)||0), 0);
     document.getElementById('statCount').textContent = state.items.length; document.getElementById('statShops').textContent = new Set(state.items.map(i => i.shop.toLowerCase())).size; document.getElementById('statTotal').textContent = formatPrice(total); document.getElementById('totalValue').textContent = formatPrice(total); document.getElementById('totalSub').textContent = `${state.items.length} article${state.items.length>1?'s':''} · ${document.getElementById('statShops').textContent} boutique${document.getElementById('statShops').textContent>1?'s':''}`;
@@ -529,8 +560,40 @@
     chartEl.querySelectorAll('.legend-row').forEach(row => { row.addEventListener('click', () => { const label = row.dataset.legend; if (chartExcluded.has(label)) chartExcluded.delete(label); else chartExcluded.add(label); renderSummary(); }); });
   }
 
+  // ---------------------------------------------------------
+  // FONCTION DE PARTAGE (TRICOUNT-STYLE)
+  // ---------------------------------------------------------
+  document.getElementById('shareBtn').addEventListener('click', async () => {
+    const shareUrl = window.location.href;
+    
+    // 1. Tente d'ouvrir le menu de partage natif (téléphones)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Ma Wishlist Partagée',
+          text: 'Rejoins ma wishlist pour voir et ajouter des vêtements !',
+          url: shareUrl
+        });
+        return; // Succès, on arrête là
+      } catch (err) {
+        console.log('Partage annulé ou non supporté par le système');
+      }
+    }
+    
+    // 2. Si on est sur PC ou que le partage échoue, on copie le lien
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert('Lien copié dans le presse-papier ! Envoyez-le à vos amis.');
+    } catch (err) {
+      // 3. Sécurité maximale : si le navigateur bloque tout
+      prompt("Votre navigateur bloque la copie automatique. Copiez ce lien manuellement :", shareUrl);
+    }
+  });
+
   document.querySelectorAll('.toggle-btn').forEach(btn => { btn.addEventListener('click', () => { chartMode = btn.dataset.chartmode; chartExcluded.clear(); document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === btn)); renderSummary(); }); });
   function render(){ renderCategorySelect(); renderCategoryToolbar(); renderTagToolbar(); renderRacks(); renderSummary(); }
+  
+  // Démarrage
   loadState();
 </script>
 </body>
