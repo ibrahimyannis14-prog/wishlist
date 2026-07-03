@@ -3,11 +3,10 @@ const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SCRAPINGBOT_API_KEY = 'sb_57b2732fae04e22bc4337c26e31dd242a50cd4935353ff11299f64cdb8ebe6f8';
 
-// Autorise ton frontend à faire des requêtes vers ce backend
 app.use(cors());
 
-// Route principale appelée par ton frontend
 app.get('/api/scrape', async (req, res) => {
     const targetUrl = req.query.url;
 
@@ -17,46 +16,34 @@ app.get('/api/scrape', async (req, res) => {
 
     try {
         console.log(`[SCRAPE] Demande reçue pour : ${targetUrl}`);
-        console.log(`[SCRAPE] Interrogation de Microlink...`);
 
-        // Appel à l'API gratuite de Microlink
-        const microlinkUrl = `https://api.microlink.io?url=${encodeURIComponent(targetUrl)}`;
+        // Utilisation de ScrapingBot avec le mode 'retail' pour le shopping
+        const scrapeApiUrl = `https://api.scrapingbot.io/scrape?apiKey=${SCRAPINGBOT_API_KEY}&url=${encodeURIComponent(targetUrl)}&scraper=retail`;
         
-        // Utilisation du fetch natif de Node.js (nécessite Node 18+)
-        const response = await fetch(microlinkUrl);
-        
-        if (!response.ok) {
-            throw new Error(`Microlink a répondu avec le statut ${response.status}`);
-        }
+        const response = await fetch(scrapeApiUrl);
+        const data = await response.json();
 
-        const json = await response.json();
+        // ScrapingBot renvoie un tableau d'objets, on prend le premier
+        const product = Array.isArray(data) ? data[0] : data;
 
-        if (json.status === 'success' && json.data) {
-            const data = json.data;
-            
-            // Formatage des données exactement comme ton frontend les attend
-            const result = {
-                title: data.title || '',
-                shop: data.publisher || guessShopFromUrl(targetUrl),
-                image: data.image ? data.image.url : null,
-                price: null, // Microlink ne garantit pas le prix
-                availability: 'Inconnue'
-            };
+        // On mappe les données de ScrapingBot vers ton format
+        const result = {
+            title: product.title || '',
+            shop: product.brand || guessShopFromUrl(targetUrl),
+            image: product.imageUrl || product.images?.[0] || null,
+            price: product.price || null,
+            availability: product.availability || 'Inconnue'
+        };
 
-            console.log(`[SCRAPE] Succès ! Renvoi des données au frontend.`);
-            return res.json(result);
-        } else {
-            throw new Error('Données Microlink invalides ou inexploitables');
-        }
+        console.log(`[SCRAPE] Succès via ScrapingBot.`);
+        return res.json(result);
 
     } catch (error) {
         console.error(`[SCRAPE] ERREUR :`, error.message);
-        // On renvoie un objet vide pour ne pas faire planter le frontend
-        return res.json({ title: '', shop: '', image: null, price: null });
+        return res.json({ title: '', shop: '', image: null, price: null, availability: 'Inconnue' });
     }
 });
 
-// Petite fonction de secours pour deviner la boutique si Microlink ne la trouve pas
 function guessShopFromUrl(urlString) {
     try {
         const u = new URL(urlString);
@@ -64,11 +51,9 @@ function guessShopFromUrl(urlString) {
         const parts = host.split('.');
         let name = parts.length > 2 ? parts[parts.length - 2] : parts[0];
         return name.charAt(0).toUpperCase() + name.slice(1);
-    } catch (e) {
-        return '';
-    }
+    } catch (e) { return ''; }
 }
 
 app.listen(PORT, () => {
-    console.log(`Serveur de scraping démarré sur le port ${PORT}`);
+    console.log(`Serveur prêt sur le port ${PORT}`);
 });
