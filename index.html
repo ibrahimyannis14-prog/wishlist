@@ -31,7 +31,7 @@
   .stat{background:var(--bg-alt); border-radius:var(--radius-md); padding:14px 20px; min-width:96px;}
   .stat-value{font-family:var(--font-display); font-size:22px; font-weight:700; display:block;}
   .stat-label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;}
-  .share-badge { background: var(--accent-soft); color: var(--accent-ink); padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--accent); cursor: pointer; transition: background 0.2s;}
+  .share-badge { background: var(--accent-soft); color: var(--accent-ink); padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--accent); cursor: pointer; transition: background 0.2s;}
   .share-badge:hover { background: var(--accent); color: white; }
   .section-head{display:flex; align-items:center; gap:12px; margin:52px 0 20px;}
   .section-head .num{font-family:var(--font-mono); background:var(--ink); color:#fff; font-size:11px; padding:3px 8px; border-radius:20px; flex:none;}
@@ -178,12 +178,10 @@
       <span class="hero-eyebrow">Wishlist Partagée</span>
       <h1 class="hero-title">Ma liste de<br>vêtements</h1>
       <div class="io-actions">
-        <button class="btn btn-small" id="exportBtn">Exporter la liste</button>
-        <label class="btn btn-small" for="importInput" style="display:inline-flex;align-items:center;">Importer une liste</label>
-        <input type="file" id="importInput" accept="application/json" style="display:none;">
-        <button class="share-badge" id="shareBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-          Partager
+        <!-- APPEL DIRECT À LA FONCTION DE PARTAGE INFAILLIBLE -->
+        <button class="share-badge" id="shareBtn" onclick="partagerListe()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          Partager cette liste
         </button>
       </div>
     </div>
@@ -279,6 +277,28 @@
   <footer>Les données sont sauvegardées en temps réel sur le cloud (Firebase).</footer>
 </div>
 
+<!-- LE SCRIPT DE PARTAGE INFAILLIBLE (Placé hors du module) -->
+<script>
+  function partagerListe() {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: 'Ma Wishlist Partagée', url: url }).catch(e => console.log("Partage annulé"));
+    } else {
+      try {
+        navigator.clipboard.writeText(url).then(() => alert("✅ Lien copié dans le presse-papier !"));
+      } catch (err) {
+        const input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        alert("✅ Lien copié dans le presse-papier !");
+      }
+    }
+  }
+</script>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -349,7 +369,11 @@
   async function fetchPreview(url) {
     const token = ++fetchToken;
     const box = document.getElementById('previewBox');
-    box.innerHTML = `<span class="preview-placeholder">Recherche en cours via le serveur Render...</span>`;
+    
+    // Animation de chargement pour rassurer pendant le réveil de Render
+    box.innerHTML = `<div style="text-align:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg><br><span style="font-size:10px;color:var(--muted);display:block;margin-top:8px;">Recherche en cours...</span></div>
+    <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
+    
     fetchedImage = null;
     try {
       const res = await fetch(`${RENDER_API_URL}/api/scrape?url=${encodeURIComponent(url)}`);
@@ -362,7 +386,7 @@
       const priceField = document.getElementById('f-price'); if (!priceField.value && data.price != null) priceField.value = data.price;
       const availCheckbox = document.getElementById('f-avail-rupture'); if (data.availability === 'Rupture') availCheckbox.checked = true; else availCheckbox.checked = false;
       const noteField = document.getElementById('f-note'); if (!noteField.value && data.title) noteField.value = data.title.slice(0, 80);
-    } catch(e) { if (token !== fetchToken) return; box.innerHTML = `<span class="preview-placeholder">Échec de la récupération. Le serveur Render est bien allumé ?</span>`; }
+    } catch(e) { if (token !== fetchToken) return; box.innerHTML = `<span class="preview-placeholder" style="color:var(--bad);">Échec de la récupération. Entrez les infos manuellement.</span>`; }
   }
 
   let urlDebounce;
@@ -506,10 +530,6 @@
     const clearBtn = document.getElementById('clearTagFilters'); if(clearBtn) clearBtn.addEventListener('click', () => { activeTagFilters.clear(); render(); });
   }
 
-  function iconEdit(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
-  function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6h12z"/></svg>`; }
-  function iconHanger(color){ return `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6"><circle cx="12" cy="4" r="1.6"/><path d="M12 6v2"/><path d="M2 20l8.5-6a2 2 0 012.9 0L22 20"/><path d="M2 20h20"/></svg>`; }
-
   function renderItemCard(item){
     const cat = findCategory(item.categoryId), style = AVAIL_STYLE[item.availability] || AVAIL_STYLE['Inconnue'];
     const photoHtml = `<div class="ph-placeholder" style="background:${cat.color}18">${iconHanger(cat.color)}</div>${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.shop)}" loading="lazy" onerror="this.style.display='none'">` : ''}`;
@@ -560,40 +580,8 @@
     chartEl.querySelectorAll('.legend-row').forEach(row => { row.addEventListener('click', () => { const label = row.dataset.legend; if (chartExcluded.has(label)) chartExcluded.delete(label); else chartExcluded.add(label); renderSummary(); }); });
   }
 
-  // ---------------------------------------------------------
-  // FONCTION DE PARTAGE (TRICOUNT-STYLE)
-  // ---------------------------------------------------------
-  document.getElementById('shareBtn').addEventListener('click', async () => {
-    const shareUrl = window.location.href;
-    
-    // 1. Tente d'ouvrir le menu de partage natif (téléphones)
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Ma Wishlist Partagée',
-          text: 'Rejoins ma wishlist pour voir et ajouter des vêtements !',
-          url: shareUrl
-        });
-        return; // Succès, on arrête là
-      } catch (err) {
-        console.log('Partage annulé ou non supporté par le système');
-      }
-    }
-    
-    // 2. Si on est sur PC ou que le partage échoue, on copie le lien
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      alert('Lien copié dans le presse-papier ! Envoyez-le à vos amis.');
-    } catch (err) {
-      // 3. Sécurité maximale : si le navigateur bloque tout
-      prompt("Votre navigateur bloque la copie automatique. Copiez ce lien manuellement :", shareUrl);
-    }
-  });
-
   document.querySelectorAll('.toggle-btn').forEach(btn => { btn.addEventListener('click', () => { chartMode = btn.dataset.chartmode; chartExcluded.clear(); document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === btn)); renderSummary(); }); });
   function render(){ renderCategorySelect(); renderCategoryToolbar(); renderTagToolbar(); renderRacks(); renderSummary(); }
-  
-  // Démarrage
   loadState();
 </script>
 </body>
