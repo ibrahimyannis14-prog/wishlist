@@ -2,34 +2,27 @@ const express = require('express');
 const cors = require('cors');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Autorise ton futur site GitHub Pages à communiquer avec ce serveur
 app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
 
+// Petite page d'accueil simple pour vérifier que le serveur tourne sur Render
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'liste-vetements.html'));
+  res.send('✅ Le moteur de Scraping est en ligne et prêt à recevoir des liens !');
 });
 
 // ---------- Utilitaires de nettoyage ----------
 function cleanPrice(raw) {
   if (raw === null || raw === undefined) return null;
   let str = String(raw).trim();
-
-  // 1. Remplace les espaces HTML invisibles
   str = str.replace(/&nbsp;/gi, ' ');
-  
-  // 2. Gère les formats où l'espace agit comme une virgule décimale (ex: "299 99 €")
   str = str.replace(/(\d+)[\s\u00A0\u202F\u200B]+(\d{2})(?:[\s€£$]*)$/i, '$1.$2');
-
-  // 3. Nettoie tout le reste (garde uniquement les chiffres, points, virgules et tirets)
   str = str.replace(/[^\d,.\-]/g, '');
   if (!str) return null;
 
-  // 4. Conversion propre selon si c'est un point ou une virgule
   if (str.includes(',') && str.includes('.')) {
     str = str.lastIndexOf(',') > str.lastIndexOf('.')
       ? str.replace(/\./g, '').replace(',', '.')
@@ -69,7 +62,6 @@ function parseHTML(html, targetUrl) {
   const $ = cheerio.load(html);
   let title = null, image = null, jsonPrice = null, metaPrice = null, htmlPrice = null, currency = null, availability = null;
 
-  // 1. JSON-LD (Souvent en centimes sur certains sites, ex: 29999)
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
       const parsed = JSON.parse($(el).contents().text());
@@ -99,7 +91,6 @@ function parseHTML(html, targetUrl) {
     } catch (e) {}
   });
 
-  // 2. Meta tags
   const meta = (name) => $(`meta[property="${name}"]`).attr('content') || $(`meta[name="${name}"]`).attr('content');
   if (!title) title = meta('og:title') || $('title').first().text() || null;
   if (!image) image = meta('og:image') || meta('twitter:image') || null;
@@ -109,7 +100,6 @@ function parseHTML(html, targetUrl) {
   if (!currency) currency = meta('og:price:currency') || meta('product:price:currency') || null;
   if (!availability) availability = meta('og:availability') || meta('product:availability') || null;
 
-  // 3. HTML visuel (Le prix réellement affiché à l'écran)
   const priceSelectors = [
     '.price', '.product-price', '.current-price', '.price-value',
     '[data-price]', '#price', '.price__current', '.price-sale',
@@ -125,19 +115,15 @@ function parseHTML(html, targetUrl) {
     }
   }
 
-  // LOGIQUE DE SÉLECTION DU PRIX FINAL (Fix pour les centimes)
   let validPrices = [cleanPrice(jsonPrice), cleanPrice(metaPrice), htmlPrice].filter(p => p !== null && p > 0);
   let finalPrice = null;
   
   if (validPrices.length > 0) {
     let minP = Math.min(...validPrices);
     let maxP = Math.max(...validPrices);
-    
-    // Si un prix est exactement 100x plus grand, c'est l'anomalie des centimes. On garde le petit.
     if (maxP === minP * 100) {
       finalPrice = minP;
     } else {
-      // Sinon, on priorise le prix vu par l'humain (HTML), puis Meta, puis JSON
       finalPrice = htmlPrice !== null ? htmlPrice : (cleanPrice(metaPrice) !== null ? cleanPrice(metaPrice) : cleanPrice(jsonPrice));
     }
   }
@@ -227,6 +213,5 @@ app.get('/api/scrape', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Serveur prêt : http://localhost:${PORT}`);
-  console.log(`🔄 Scraping actif : Fetch rapide -> Repli automatique sur Puppeteer`);
+  console.log(`✅ Serveur prêt sur le port ${PORT}`);
 });
