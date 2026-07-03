@@ -98,7 +98,6 @@
   @media (hover: none) {
     .ic-icons { opacity: 1 !important; }
   }
-  /* ------------------------------------ */
   
   .ic-icons button{background:rgba(255,255,255,0.92); border:none;border-radius:50%; width:28px;height:28px; display:flex;align-items:center;justify-content:center; box-shadow:var(--shadow-sm);}
   .ic-icons svg {width: 14px; height: 14px;}
@@ -167,10 +166,6 @@
     .total-card { padding: 24px; text-align: center; }
     .donut-wrap { flex-direction: column; align-items: center; gap: 24px; }
     .donut-legend { width: 100%; }
-    
-    /* FIX MOBILE ADDITIONNEL: SECURITÉ POUR S'ASSURER QUE CA FONCTIONNE MEME SI HOVER:NONE N'EST PAS DETECTE */
-    .ic-icons { opacity: 1 !important; }
-    
     .new-cat { flex-direction: column; align-items: stretch; width: 100%; }
     .new-cat select, .new-cat input { max-width: 100%; width: 100%; margin-bottom: 5px; }
     .new-cat button { align-self: flex-end; }
@@ -189,7 +184,6 @@
       <span class="hero-eyebrow">Wishlist Partagée</span>
       <h1 class="hero-title">Ma liste de<br>vêtements</h1>
       <div class="io-actions">
-        <!-- APPEL DIRECT À LA FONCTION DE PARTAGE INFAILLIBLE -->
         <button class="share-badge" id="shareBtn" onclick="partagerListe()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
           Partager cette liste
@@ -241,7 +235,7 @@
             <input id="f-tags-input" type="text" placeholder="Tapez une étiquette et Entrée">
           </div>
         </div>
-        <p class="hint" id="imgHint">Photo, boutique et repère sont récupérés automatiquement via Microlink (le prix et la taille sont à saisir manuellement).</p>
+        <p class="hint" id="imgHint">Photo, boutique et repère sont récupérés automatiquement via ScrapingBot (le prix et la taille sont à saisir manuellement).</p>
         <div class="field" id="manualImgField" style="margin-top:10px;"><label class="field-title" for="f-image">URL de l'image manuelle</label><input id="f-image" type="url" placeholder="https://.../photo.jpg"></div>
         <div class="panel-actions">
           <button class="btn btn-ghost" id="cancelEdit" style="display:none;">Annuler</button>
@@ -288,7 +282,6 @@
   <footer>Les données sont sauvegardées en temps réel sur le cloud (Firebase).</footer>
 </div>
 
-<!-- LE SCRIPT DE PARTAGE INFAILLIBLE (Placé hors du module) -->
 <script>
   function partagerListe() {
     const url = window.location.href;
@@ -347,7 +340,7 @@
   const DEFAULT_CATEGORIES = [
     {id:'hauts', name:'Hauts', parentId:null}, {id:'hauts-pull', name:'Pull', parentId:'hauts'}, {id:'hauts-zip', name:'Zip', parentId:'hauts'}, {id:'hauts-tshirt', name:'T-Shirt', parentId:'hauts'},
     {id:'bas', name:'Bas', parentId:null}, {id:'bas-survetements', name:'Survêtements', parentId:'bas'}, {id:'bas-pantalons', name:'Pantalons', parentId:'bas'}, {id:'bas-shorts', name:'Shorts', parentId:'bas'},
-    {id:'chaussures', name:'Chaussures', parentId:null}, {id:'accessoires', name:'Accessoires', parentId:null}
+    {id:'chaussures', name:'Chaussures', parentId:null}, {id:'accessoires', name:'Accessoires', parentId:'null'}
   ].map((c, i) => ({ ...c, color: colorForIndex(i), locked: false }));
 
   let state = { categories: DEFAULT_CATEGORIES.map(c => ({...c})), items: [], collapsedCats: [], tagColors: {} };
@@ -359,7 +352,6 @@
   function escapeHtml(str){ const d=document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
   function formatPrice(n){ return (Number(n)||0).toLocaleString('fr-FR', {style:'currency', currency:'EUR'}); }
 
-  // FONCTIONS SVG
   function iconEdit(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
   function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6h12z"/></svg>`; }
   function iconHanger(color){ return `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6"><circle cx="12" cy="4" r="1.6"/><path d="M12 6v2"/><path d="M2 20l8.5-6a2 2 0 012.9 0L22 20"/><path d="M2 20h20"/></svg>`; }
@@ -384,45 +376,33 @@
     const token = ++fetchToken;
     const box = document.getElementById('previewBox');
     
-    box.innerHTML = `<div style="text-align:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg><br><span style="font-size:10px;color:var(--muted);display:block;margin-top:8px;">Analyse Microlink...</span></div>
+    box.innerHTML = `<div style="text-align:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg><br><span style="font-size:10px;color:var(--muted);display:block;margin-top:8px;">ScrapingBot en action...</span></div>
     <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
     
     fetchedImage = null;
     try {
-      const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
-      if (!res.ok) throw new Error('Erreur Microlink');
+      const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+      if (!res.ok) throw new Error('Erreur backend');
       
-      const responseData = await res.json();
+      const data = await res.json();
       if (token !== fetchToken) return;
 
-      if (responseData.status === "success" && responseData.data) {
-        const itemData = responseData.data;
-
-        // Image
-        if (itemData.image && itemData.image.url) {
-          fetchedImage = itemData.image.url;
-          box.innerHTML = `<img src="${escapeHtml(itemData.image.url)}" alt="Aperçu"><span class="preview-status">Photo trouvée ✓</span>`;
+      if (data) {
+        if (data.image) {
+          fetchedImage = data.image;
+          box.innerHTML = `<img src="${escapeHtml(data.image)}" alt="Aperçu"><span class="preview-status">Photo trouvée ✓</span>`;
         } else {
           box.innerHTML = `<span class="preview-placeholder">Pas de photo trouvée</span>`;
         }
 
-        // Boutique
-        const shopField = document.getElementById('f-shop');
-        if (!shopField.dataset.touched && itemData.publisher) {
-          shopField.value = itemData.publisher;
-        }
-
-        // Repère / Titre
-        const noteField = document.getElementById('f-note');
-        if (!noteField.value && itemData.title) {
-          noteField.value = itemData.title.slice(0, 80);
-        }
-      } else {
-        throw new Error('Données incomplètes');
+        if (data.shop) document.getElementById('f-shop').value = data.shop;
+        if (data.price) document.getElementById('f-price').value = data.price;
+        if (data.availability === 'Rupture') document.getElementById('f-avail-rupture').checked = true;
+        if (data.title) document.getElementById('f-note').value = data.title.slice(0, 80);
       }
     } catch(e) {
       if (token !== fetchToken) return;
-      box.innerHTML = `<span class="preview-placeholder" style="color:var(--bad);">Échec Microlink. Entrez les infos manuellement.</span>`;
+      box.innerHTML = `<span class="preview-placeholder" style="color:var(--bad);">Échec. Entrez les infos manuellement.</span>`;
     }
   }
 
