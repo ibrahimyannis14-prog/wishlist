@@ -6,10 +6,8 @@ const puppeteer = require('puppeteer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Autorise ton futur site GitHub Pages à communiquer avec ce serveur
 app.use(cors());
 
-// Petite page d'accueil simple pour vérifier que le serveur tourne sur Render
 app.get('/', (req, res) => {
   res.send('✅ Le moteur de Scraping est en ligne et prêt à recevoir des liens !');
 });
@@ -142,7 +140,8 @@ function parseHTML(html, targetUrl) {
 // ---------- Stratégie 1 : FETCH SIMPLE ----------
 async function scrapeWithFetch(targetUrl) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000); 
+  // On donne 15 secondes max au Fetch simple
+  const timeout = setTimeout(() => controller.abort(), 15000); 
 
   try {
     const response = await fetch(targetUrl, {
@@ -168,14 +167,21 @@ async function scrapeWithPuppeteer(targetUrl) {
   try {
     browser = await puppeteer.launch({ 
       headless: "new", 
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // Évite de faire crasher la RAM de Render
+        '--disable-gpu',
+        '--single-process' // Rend Puppeteer plus léger
+      ]
     });
     const page = await browser.newPage();
     
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'fr-FR,fr;q=0.9' });
 
-    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+    // On donne 30 secondes d'attente pour Puppeteer au cas où le site est lent
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     
     const html = await page.content();
     return parseHTML(html, targetUrl);
