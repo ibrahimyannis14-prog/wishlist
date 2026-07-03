@@ -211,7 +211,10 @@
         </div>
         <div class="field-grid">
           <div class="field"><label class="field-title" for="f-shop">Boutique</label><input id="f-shop" type="text" placeholder="Détectée depuis le lien"></div>
-          <div class="field"><label class="field-title" for="f-price">Prix</label><input id="f-price" type="number" min="0" step="0.01" placeholder="49.90"></div>
+          
+          <!-- CORRECTION 1 : Le champ prix accepte maintenant les virgules -->
+          <div class="field"><label class="field-title" for="f-price">Prix</label><input id="f-price" type="text" inputmode="decimal" placeholder="49.90"></div>
+          
           <div class="field"><label class="field-title" for="f-size">Taille</label><input id="f-size" type="text" placeholder="M / 38"></div>
           <div class="field">
             <label class="field-title">Disponibilité</label>
@@ -354,6 +357,7 @@
     onSnapshot(doc(db, "wishlists", listId), (docSnap) => {
       if (docSnap.exists()) { state = docSnap.data(); } 
       else { state = { categories: DEFAULT_CATEGORIES.map(c => ({...c})), items: [], collapsedCats: [], tagColors: {} }; saveState(); }
+      if(!state.items) state.items = []; // CORRECTION 2 : Sécurité anti-crash si le document Firebase n'a pas encore d'items
       if(!state.collapsedCats) state.collapsedCats = []; if(!state.tagColors) state.tagColors = {};
       ensureDefaultCategories(); render();
     });
@@ -449,18 +453,36 @@
   document.getElementById('cancelEdit').addEventListener('click', resetForm);
 
   document.getElementById('submitBtn').addEventListener('click', () => {
-    const url = document.getElementById('f-url').value.trim(), shop = document.getElementById('f-shop').value.trim(), price = parseFloat(document.getElementById('f-price').value);
+    const url = document.getElementById('f-url').value.trim();
+    const shop = document.getElementById('f-shop').value.trim();
+    
+    // CORRECTION 1 (Suite) : Extraction propre du prix avec ou sans virgule
+    let rawPrice = document.getElementById('f-price').value.trim();
+    if(rawPrice) rawPrice = rawPrice.replace(/,/g, '.').replace(/[^\d.-]/g, '');
+    const price = parseFloat(rawPrice);
+    
     const size = document.getElementById('f-size').value.trim();
     const avail = document.getElementById('f-avail-rupture').checked ? 'Rupture' : 'En stock';
     let cat = document.getElementById('f-cat').value;
     if (!cat && state.categories.length > 0) cat = state.categories[0].id;
     const note = document.getElementById('f-note').value.trim();
+    
     if(!url || !shop || isNaN(price)){ alert('Merci de renseigner au moins le lien, la boutique et le prix.'); return; }
+    
     if(currentTags.length === 0 && document.getElementById('f-tags-input').value.trim()) addTagFromInput();
     const tags = [...currentTags];
-    if(editingId){ Object.assign(state.items.find(i => i.id === editingId), {url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null}); } 
-    else { state.items.push({ id: uid(), url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null, addedAt: Date.now() }); }
-    saveState(); resetForm(); 
+    
+    if(!state.items) state.items = []; // CORRECTION 2 : Sécurité de secours
+
+    if(editingId){ 
+      Object.assign(state.items.find(i => i.id === editingId), {url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null}); 
+    } else { 
+      state.items.push({ id: uid(), url, shop, price, size, availability: avail, categoryId: cat, note, tags, image: fetchedImage || null, addedAt: Date.now() }); 
+    }
+    
+    saveState(); 
+    render(); // CORRECTION 3 : L'élément s'affiche IMMÉDIATEMENT sur la page
+    resetForm(); 
   });
 
   window.startEdit = function(id){
@@ -476,7 +498,7 @@
     document.getElementById('submitBtn').textContent = 'Enregistrer les modifications'; document.getElementById('cancelEdit').style.display = 'inline-block';
     document.querySelector('.panel').scrollIntoView({behavior: 'smooth', block: 'center'});
   }
-  window.deleteItem = function(id){ state.items = state.items.filter(i => i.id !== id); saveState(); }
+  window.deleteItem = function(id){ state.items = state.items.filter(i => i.id !== id); saveState(); render(); }
   document.getElementById('searchInput').addEventListener('input', render);
 
   function renderCatChip(cat, isSub, hasChildren = false){ 
@@ -509,13 +531,13 @@
         const fallbackId = state.categories[0].id;
         state.items.forEach(it => { if(allIds.includes(it.categoryId)) it.categoryId = fallbackId; }); 
         if(allIds.includes(activeCategoryFilter)) activeCategoryFilter = 'all'; 
-        saveState(); 
+        saveState(); render();
       }); 
     });
     document.getElementById('addCatBtn').addEventListener('click', addCategory); document.getElementById('newCatInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') addCategory(); });
   }
 
-  function addCategory(){ const input = document.getElementById('newCatInput'), parentSel = document.getElementById('newCatParent'), name = input.value.trim(); if(!name) return; const parentId = parentSel.value || null, id = uid(); state.categories.push({id, name, color: colorForIndex(state.categories.length), parentId, locked:false}); input.value = ''; saveState(); }
+  function addCategory(){ const input = document.getElementById('newCatInput'), parentSel = document.getElementById('newCatParent'), name = input.value.trim(); if(!name) return; const parentId = parentSel.value || null, id = uid(); state.categories.push({id, name, color: colorForIndex(state.categories.length), parentId, locked:false}); input.value = ''; saveState(); render(); }
   function itemMatchesSearch(item, query){ if(!query) return true; return `${item.shop} ${item.note||''} ${item.size} ${(item.tags||[]).join(' ')}`.toLowerCase().includes(query.toLowerCase()); }
   function itemMatchesTags(item){ if(activeTagFilters.size === 0) return true; return (item.tags||[]).some(t => activeTagFilters.has(t)); }
 
