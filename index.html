@@ -98,6 +98,7 @@
   @media (hover: none) {
     .ic-icons { opacity: 1 !important; }
   }
+  /* ------------------------------------ */
   
   .ic-icons button{background:rgba(255,255,255,0.92); border:none;border-radius:50%; width:28px;height:28px; display:flex;align-items:center;justify-content:center; box-shadow:var(--shadow-sm);}
   .ic-icons svg {width: 14px; height: 14px;}
@@ -184,6 +185,7 @@
       <span class="hero-eyebrow">Wishlist Partagée</span>
       <h1 class="hero-title">Ma liste de<br>vêtements</h1>
       <div class="io-actions">
+        <!-- APPEL DIRECT À LA FONCTION DE PARTAGE INFAILLIBLE -->
         <button class="share-badge" id="shareBtn" onclick="partagerListe()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
           Partager cette liste
@@ -282,6 +284,7 @@
   <footer>Les données sont sauvegardées en temps réel sur le cloud (Firebase).</footer>
 </div>
 
+<!-- LE SCRIPT DE PARTAGE INFAILLIBLE (Placé hors du module) -->
 <script>
   function partagerListe() {
     const url = window.location.href;
@@ -317,6 +320,9 @@
     measurementId: "G-KPXC2PT5TB"
   };
   
+  // ICI ON APPELLE TON SERVEUR RENDER
+  const RENDER_API_URL = "https://wishlist-rj6p.onrender.com"; 
+
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
@@ -340,7 +346,7 @@
   const DEFAULT_CATEGORIES = [
     {id:'hauts', name:'Hauts', parentId:null}, {id:'hauts-pull', name:'Pull', parentId:'hauts'}, {id:'hauts-zip', name:'Zip', parentId:'hauts'}, {id:'hauts-tshirt', name:'T-Shirt', parentId:'hauts'},
     {id:'bas', name:'Bas', parentId:null}, {id:'bas-survetements', name:'Survêtements', parentId:'bas'}, {id:'bas-pantalons', name:'Pantalons', parentId:'bas'}, {id:'bas-shorts', name:'Shorts', parentId:'bas'},
-    {id:'chaussures', name:'Chaussures', parentId:null}, {id:'accessoires', name:'Accessoires', parentId:'null'}
+    {id:'chaussures', name:'Chaussures', parentId:null}, {id:'accessoires', name:'Accessoires', parentId:null}
   ].map((c, i) => ({ ...c, color: colorForIndex(i), locked: false }));
 
   let state = { categories: DEFAULT_CATEGORIES.map(c => ({...c})), items: [], collapsedCats: [], tagColors: {} };
@@ -352,6 +358,7 @@
   function escapeHtml(str){ const d=document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
   function formatPrice(n){ return (Number(n)||0).toLocaleString('fr-FR', {style:'currency', currency:'EUR'}); }
 
+  // FONCTIONS SVG
   function iconEdit(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
   function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6h12z"/></svg>`; }
   function iconHanger(color){ return `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6"><circle cx="12" cy="4" r="1.6"/><path d="M12 6v2"/><path d="M2 20l8.5-6a2 2 0 012.9 0L22 20"/><path d="M2 20h20"/></svg>`; }
@@ -381,7 +388,7 @@
     
     fetchedImage = null;
     try {
-      const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+      const res = await fetch(`${RENDER_API_URL}/api/scrape?url=${encodeURIComponent(url)}`);
       if (!res.ok) throw new Error('Erreur backend');
       
       const data = await res.json();
@@ -397,7 +404,11 @@
 
         if (data.shop) document.getElementById('f-shop').value = data.shop;
         if (data.price) document.getElementById('f-price').value = data.price;
-        if (data.availability === 'Rupture') document.getElementById('f-avail-rupture').checked = true;
+        if (data.availability === 'Rupture') {
+            document.getElementById('f-avail-rupture').checked = true;
+        } else {
+            document.getElementById('f-avail-rupture').checked = false;
+        }
         if (data.title) document.getElementById('f-note').value = data.title.slice(0, 80);
       }
     } catch(e) {
